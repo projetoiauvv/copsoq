@@ -201,7 +201,119 @@ function consolidateBatch(respondents){ const bySub={}; respondents.forEach((r)=
 function renderConsolidatedReport(report){ document.getElementById("report-empty").classList.add("hidden"); document.getElementById("report-content").classList.remove("hidden"); document.getElementById("total-respondents").textContent=String(report.respondentCount); document.getElementById("global-index").textContent="Interpretação fator a fator (sem escore único)."; const container=document.getElementById("dimension-results"); container.innerHTML=""; report.subscales.forEach((s)=>{ const row=document.createElement("div"); row.className="result-row"; row.innerHTML=`<div><strong>${s.name}</strong></div><div>Média: ${s.mean} (1-5)</div><div>Respondentes: ${s.respondents}</div><div class="badge ${s.color==="green"?"low":s.color==="yellow"?"medium":"high"}">${s.label}</div>`; container.appendChild(row);}); }
 function analyzeCsvBase(){ const file=document.getElementById("csv-input").files?.[0]; if(!file) return alert("Selecione a planilha CSV."); file.text().then((text)=>{ try{ const respondents=parseCsv(text); const report=consolidateBatch(respondents); window.__LAST_BATCH_REPORT__=report; renderConsolidatedReport(report); document.getElementById("base-summary").textContent=`Planilha analisada: ${report.respondentCount} colaboradores, 29 subescalas.`; } catch(e){ alert(e.message);} });}
 function downloadBatchJson(){ if(!window.__LAST_BATCH_REPORT__) return alert("Analise a planilha antes de exportar."); const blob=new Blob([JSON.stringify(window.__LAST_BATCH_REPORT__,null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="relatorio-copsoq-consolidado.json"; a.click(); }
-function downloadBatchPdf(){ if(!window.__LAST_BATCH_REPORT__) return alert("Analise a planilha antes de baixar PDF."); const report=window.__LAST_BATCH_REPORT__; const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:"pt",format:"a4"}); let y=40; doc.text("COPSOQ II PT - Relatório consolidado",40,y); y+=20; doc.text(`Respondentes: ${report.respondentCount}`,40,y); y+=16; report.subscales.forEach((s,i)=>{ if(y>780){doc.addPage(); y=40;} doc.text(`${i+1}. ${s.name}: ${s.mean} - ${s.label}`,40,y); y+=14;}); doc.save("relatorio-copsoq-consolidado.pdf"); }
+function getRiskSummary(subscales) {
+  let green = 0;
+  let yellow = 0;
+  let red = 0;
+  subscales.forEach((s) => {
+    if (s.color === "green") green += 1;
+    else if (s.color === "yellow") yellow += 1;
+    else red += 1;
+  });
+  return { green, yellow, red, total: subscales.length };
+}
+
+function drawTableRow(doc, y, cols, widths, opts = {}) {
+  const x0 = 40;
+  const h = opts.height || 20;
+  let x = x0;
+  if (opts.fillColor) {
+    doc.setFillColor(...opts.fillColor);
+    doc.rect(x0, y - 14, widths.reduce((a, b) => a + b, 0), h, "F");
+  }
+  doc.setDrawColor(210, 210, 210);
+  doc.rect(x0, y - 14, widths.reduce((a, b) => a + b, 0), h);
+  for (let i = 0; i < cols.length; i += 1) {
+    doc.text(String(cols[i]), x + 4, y);
+    x += widths[i];
+    if (i < cols.length - 1) doc.line(x, y - 14, x, y + 6);
+  }
+  return y + h;
+}
+
+function riskColor(color) {
+  if (color === "red") return [198, 40, 40];
+  if (color === "yellow") return [194, 124, 14];
+  return [28, 138, 67];
+}
+
+function downloadBatchPdf(){
+  if(!window.__LAST_BATCH_REPORT__) return alert("Analise a planilha antes de baixar PDF.");
+  const report=window.__LAST_BATCH_REPORT__;
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:"pt",format:"a4"});
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  let y = 44;
+
+  const ensureSpace = (needed = 24) => {
+    if (y + needed > 790) { doc.addPage(); y = 44; }
+  };
+
+  const h1 = (t) => { ensureSpace(28); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text(t, margin, y); y += 24; };
+  const h2 = (t) => { ensureSpace(22); doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(t, margin, y); y += 18; };
+  const p = (t) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    const lines = doc.splitTextToSize(t, pageW - margin * 2);
+    ensureSpace(lines.length * 13 + 8);
+    doc.text(lines, margin, y); y += lines.length * 13 + 6;
+  };
+
+  const summary = getRiskSummary(report.subscales);
+  const riskPct = ((summary.red / summary.total) * 100).toFixed(1);
+
+  h1("RELATÓRIO DE AVALIAÇÃO DE RISCOS PSICOSSOCIAIS");
+
+  h2("INFORMAÇÕES DA AVALIAÇÃO");
+  doc.setFontSize(10);
+  y = drawTableRow(doc, y, ["Campo", "Valor"], [200, 315], { fillColor: [240, 245, 255] });
+  y = drawTableRow(doc, y, ["Data da Avaliação", new Date(report.generatedAt).toLocaleString("pt-BR")], [200, 315]);
+  y = drawTableRow(doc, y, ["Total de Colaboradores", report.respondentCount], [200, 315]);
+  y = drawTableRow(doc, y, ["Total de Itens COPSOQ", report.totalQuestions], [200, 315]);
+  y += 12;
+
+  h2("RESUMO EXECUTIVO");
+  p(`Esta avaliação consolidada analisou ${report.respondentCount} colaboradores na versão média portuguesa do COPSOQ II (76 itens, 29 subescalas). Foram identificadas ${summary.red} subescalas em risco (vermelho), ${summary.yellow} em nível intermédio (amarelo) e ${summary.green} em situação favorável (verde). Percentual de subescalas em risco: ${riskPct}%.`);
+
+  h2("INDICADORES GERAIS");
+  y = drawTableRow(doc, y, ["Indicador", "Valor", "Interpretação"], [180, 90, 245], { fillColor: [240, 245, 255] });
+  y = drawTableRow(doc, y, ["Subescalas avaliadas", summary.total, "Abrangência da avaliação"] , [180, 90, 245]);
+  y = drawTableRow(doc, y, ["Risco (vermelho)", summary.red, "Exposição desfavorável para saúde"] , [180, 90, 245]);
+  y = drawTableRow(doc, y, ["Intermédio (amarelo)", summary.yellow, "Monitoramento recomendado"] , [180, 90, 245]);
+  y = drawTableRow(doc, y, ["Favorável (verde)", summary.green, "Condição adequada"] , [180, 90, 245]);
+  y = drawTableRow(doc, y, ["Percentual em risco", `${riskPct}%`, summary.red > 0 ? "Requer plano de ação" : "Sem risco relevante"] , [180, 90, 245]);
+
+  y += 14;
+  h2("ANÁLISE DETALHADA POR SUBESCALA");
+  y = drawTableRow(doc, y, ["Subescala", "Média", "Classificação"], [300, 80, 135], { fillColor: [240, 245, 255] });
+  report.subscales.forEach((s) => {
+    ensureSpace(22);
+    doc.setTextColor(...riskColor(s.color));
+    y = drawTableRow(doc, y, [s.name, s.mean.toFixed ? s.mean.toFixed(2) : s.mean, s.label], [300, 80, 135]);
+    doc.setTextColor(20, 20, 20);
+  });
+
+  h2("RECOMENDAÇÕES E PLANO DE AÇÃO");
+  p("1) Priorizar intervenções nas subescalas em vermelho. 2) Definir responsáveis, prazos e indicadores para cada ação. 3) Reavaliar em ciclos semestrais para monitoramento de tendência. 4) Manter participação de liderança, saúde ocupacional e trabalhadores no plano de prevenção.");
+
+  h2("ANEXO I — METODOLOGIA");
+  p("Questionário: COPSOQ II — Versão Média Portuguesa (76 itens). Escala de resposta: 1 a 5. Itens invertidos: 42 e 45. Interpretação por subescala (fator a fator) com semáforo por tercis: <=2,33; >2,33 e <3,66; >=3,66.");
+
+  h2("ANEXO II — PERGUNTAS DA METODOLOGIA (q1..q76)");
+  report.questionnaire.forEach((q, idx) => {
+    ensureSpace(14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    const text = `${idx + 1}. ${q.text}`;
+    const lines = doc.splitTextToSize(text, pageW - margin * 2);
+    doc.text(lines, margin, y);
+    y += lines.length * 11;
+  });
+
+  doc.save("relatorio-copsoq-consolidado.pdf");
+}
+
 
 validateQuestionnaireConfig();
 document.getElementById("analyze-base-btn").addEventListener("click", analyzeCsvBase);
