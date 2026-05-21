@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>COPSOQ II – Versão Média (76 perguntas)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="container">
+      <h1>COPSOQ II – Versão Média</h1>
+      <p class="subtitle">Análise obrigatória das 76 perguntas</p>
+    </header>
+
+    <main class="container grid">
+      <section class="card">
+        <h2>Formulário individual</h2>
+        <p>Total de perguntas carregadas: <strong id="question-count"></strong>.</p>
+        <form id="copsoq-form"></form>
+        <div class="actions">
+          <button id="calculate-btn" type="button">Gerar relatório</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Análise de base (CSV)</h2>
+        <p>Envie sua base com colunas <code>q1</code> até <code>q76</code> para processar todas as respostas.</p>
+        <input id="csv-input" type="file" accept=".csv" />
+        <div class="actions">
+          <button id="analyze-base-btn" type="button">Analisar base completa</button>
+        </div>
+        <p id="base-summary"></p>
+      </section>
+
+      <section class="card" id="report-card">
+        <h2>Relatório</h2>
+        <div id="report-empty">Preencha as 76 respostas para gerar o relatório.</div>
+        <div id="report-content" class="hidden">
+          <p><strong>Índice geral psicossocial:</strong> <span id="global-index"></span></p>
+          <div id="dimension-results"></div>
+          <div class="actions">
+            <button id="download-btn" type="button">Exportar JSON</button>
+            <button id="download-pdf-btn" type="button" class="secondary">Baixar PDF</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
