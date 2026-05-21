@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>COPSOQ II – Versão Média | Relatório</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="container">
+      <h1>COPSOQ II – Versão Média</h1>
+      <p class="subtitle">Formulário e relatório psicossocial automático</p>
+    </header>
+
+    <main class="container grid">
+      <section class="card">
+        <h2>Formulário</h2>
+        <form id="copsoq-form"></form>
+        <div class="actions">
+          <button id="calculate-btn" type="button">Gerar relatório</button>
+          <button id="reset-btn" type="button" class="secondary">Limpar</button>
+        </div>
+      </section>
+
+      <section class="card" id="report-card">
+        <h2>Relatório</h2>
+        <div id="report-empty">Preencha o formulário e clique em “Gerar relatório”.</div>
+        <div id="report-content" class="hidden">
+          <p><strong>Índice geral psicossocial:</strong> <span id="global-index"></span></p>
+          <div id="dimension-results"></div>
+          <div class="actions">
+            <button id="download-btn" type="button">Exportar resultado (JSON)</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
