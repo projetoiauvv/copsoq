@@ -1,22 +1,16 @@
-# COPSOQ II – Versão Média (76 perguntas)
+# COPSOQ II – Versão Média Portuguesa (76 itens)
 
-Aplicação web para análise **obrigatória das 76 perguntas** do COPSOQ II – Versão Média.
+Aplicação web para análise automática de planilha CSV (`q1..q76`) com base nas perguntas da versão portuguesa enviadas.
 
-## O que foi ajustado
+## Implementado
+- Perguntas `q1..q76` com textos completos.
+- 29 subescalas da versão média.
+- Itens invertidos: `q42` e `q45`.
+- Escala esperada por resposta: `1..5`.
+- Semáforo por tercis: `<=2,33`, `]2,33;3,66[`, `>=3,66`.
+- Exportação consolidada em JSON e PDF.
 
-- O sistema agora valida que o questionário possui exatamente **76 itens**.
-- Inclui análise de resposta individual (formulário).
-- Inclui análise de **base completa CSV** com colunas `q1..q76`.
-- Exporta relatório individual em JSON e PDF.
-
-## Formato da base CSV
-
-A primeira linha deve conter cabeçalhos incluindo obrigatoriamente:
-
-`q1,q2,q3,...,q76`
-
-Cada linha seguinte representa um respondente com valores de 0 a 4.
-
-## Observação técnica
-
-A estrutura de perguntas está pronta com 76 itens e processamento completo. Para aderência literal ao seu documento oficial, edite no `app.js` os campos `text`, `dimension` e `reverse` de cada item em `QUESTIONNAIRE`, mantendo os IDs `q1..q76`.
+## Formato da planilha
+- Cabeçalho obrigatório com colunas: `q1,q2,...,q76`
+- Cada linha = 1 colaborador
+- Valores permitidos: `1,2,3,4,5`
