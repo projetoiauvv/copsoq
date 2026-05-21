@@ -140,8 +140,38 @@ function validateQuestionnaireConfig() {
   if (QUESTIONNAIRE.length !== 76 || QUESTION_TEXTS.length !== 76) throw new Error("Configuração inválida: exige 76 itens.");
 }
 
-function parseCsvLine(line) { const out=[]; let cur=""; let inQuotes=false; for(let i=0;i<line.length;i+=1){const ch=line[i]; if(ch==='"'){ if(inQuotes&&line[i+1]==='"'){cur+='"'; i+=1;} else inQuotes=!inQuotes;} else if(ch===","&&!inQuotes){out.push(cur.trim()); cur="";} else cur+=ch;} out.push(cur.trim()); return out; }
+function detectDelimiter(line) {
+  const comma = (line.match(/,/g) || []).length;
+  const semicolon = (line.match(/;/g) || []).length;
+  const tab = (line.match(/	/g) || []).length;
+  if (tab >= comma && tab >= semicolon && tab > 0) return "	";
+  if (semicolon > comma && semicolon > 0) return ";";
+  return ",";
+}
 
+function parseDelimitedLine(line, delimiter) {
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === delimiter && !inQuotes) {
+      out.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur.trim());
+  return out;
+}
 
 function normalizeHeaderName(value) {
   return String(value || "")
@@ -164,7 +194,7 @@ function classifyTercil(mean, favorableHigh){ if(favorableHigh){ if(mean<=2.33)r
 
 function calculateRespondent(answerById){ const bySubscale={}; for(const item of QUESTIONNAIRE){ const raw=(answerById[item.id]??"").trim(); if(!/^[1-5]$/.test(raw)) throw new Error(`Valor inválido em ${item.id}: esperado 1..5.`); let score=Number(raw); if(item.reverse) score=6-score; if(!bySubscale[item.subscale]) bySubscale[item.subscale]={scores:[],favorableHigh:item.favorableHigh}; bySubscale[item.subscale].scores.push(score);} const subscales=Object.entries(bySubscale).map(([name,info])=>{ const mean=info.scores.reduce((a,b)=>a+b,0)/info.scores.length; return {name,mean:Number(mean.toFixed(2)),...classifyTercil(mean,info.favorableHigh),favorableHigh:info.favorableHigh};}); return {subscales}; }
 
-function parseCsv(text){ const lines=text.trim().split(/\r?\n/).filter(Boolean); if(lines.length<2) throw new Error("CSV sem dados."); const headers=parseCsvLine(lines[0]); const required=QUESTIONNAIRE.map((q)=>q.id); const canonicalToIndex={}; headers.forEach((h,i)=>{ const canonical=toCanonicalQuestionKey(h); if(canonical&&canonicalToIndex[canonical]===undefined) canonicalToIndex[canonical]=i; }); for(const col of required) if(canonicalToIndex[col]===undefined) throw new Error(`Coluna ausente: ${col}. Cabeçalhos aceitos incluem q1..q76, Q1..Q76, q_1, q-1, pergunta1 e variações.`); const respondents=[]; for(let i=1;i<lines.length;i+=1){ const cols=parseCsvLine(lines[i]); const answers={}; required.forEach((q)=>{answers[q]=cols[canonicalToIndex[q]]??"";}); respondents.push(calculateRespondent(answers)); } return respondents; }
+function parseCsv(text){ const lines=text.trim().split(/\r?\n/).filter(Boolean); if(lines.length<2) throw new Error("CSV sem dados."); const delimiter=detectDelimiter(lines[0]); const headers=parseDelimitedLine(lines[0], delimiter); const required=QUESTIONNAIRE.map((q)=>q.id); const canonicalToIndex={}; headers.forEach((h,i)=>{ const canonical=toCanonicalQuestionKey(h); if(canonical&&canonicalToIndex[canonical]===undefined) canonicalToIndex[canonical]=i; }); for(const col of required) if(canonicalToIndex[col]===undefined) throw new Error(`Coluna ausente: ${col}. Cabeçalhos aceitos incluem q1..q76, Q1..Q76, q_1, q-1, pergunta1 e variações.`); const respondents=[]; for(let i=1;i<lines.length;i+=1){ const cols=parseDelimitedLine(lines[i], delimiter); const answers={}; required.forEach((q)=>{answers[q]=cols[canonicalToIndex[q]]??"";}); respondents.push(calculateRespondent(answers)); } return respondents; }
 
 function consolidateBatch(respondents){ const bySub={}; respondents.forEach((r)=>{ r.subscales.forEach((s)=>{ if(!bySub[s.name]) bySub[s.name]={means:[],favorableHigh:s.favorableHigh}; bySub[s.name].means.push(s.mean);});}); const subscales=Object.entries(bySub).map(([name,info])=>{ const mean=info.means.reduce((a,b)=>a+b,0)/info.means.length; return {name,mean:Number(mean.toFixed(2)),respondents:info.means.length,...classifyTercil(mean,info.favorableHigh)};}); return {generatedAt:new Date().toISOString(),respondentCount:respondents.length,totalQuestions:76,subscales,questionnaire:QUESTIONNAIRE}; }
 
