@@ -273,7 +273,8 @@ function buildSequentialPontosIndex(headers) {
   const seq = [];
   headers.forEach((h, idx) => {
     const raw = String(h || "");
-    if (!/^\s*pontos\s*[–-]/i.test(raw)) return;
+    if (!/\bpontos\b/i.test(raw)) return;
+    if (/\bcoment[aá]rios?\b/i.test(raw)) return;
     const normalized = normalizeQuestionText(raw);
     if (isAdministrativePontosHeader(normalized)) return;
     seq.push(idx);
@@ -358,6 +359,17 @@ function parseCsv(text){
     }
     canonicalToIndex = strictSequentialMap;
   }
+
+  // Fallback extra por associação explícita pergunta->número:
+  // para cada qN tenta localizar "Pontos + texto da pergunta" no cabeçalho.
+  const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
+  QUESTIONNAIRE.forEach((q, idx) => {
+    const key = `q${idx + 1}`;
+    if (canonicalToIndex[key] !== undefined) return;
+    const qText = normalizeQuestionText(q.text);
+    const byContains = normalizedHeaders.findIndex((h) => h.includes(qText) || qText.includes(h));
+    if (byContains >= 0) canonicalToIndex[key] = byContains;
+  });
 
   for(const col of required) {
     if(canonicalToIndex[col]===undefined) {
