@@ -212,6 +212,39 @@ function buildQuestionTextToKeyMap() {
 
 
 
+
+function splitDelimitedRecords(text) {
+  const records = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        cur += '""';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+        cur += ch;
+      }
+      continue;
+    }
+
+    if ((ch === "\n" || ch === "\r") && !inQuotes) {
+      if (ch === "\r" && text[i + 1] === "\n") i += 1;
+      if (cur.trim().length > 0) records.push(cur);
+      cur = "";
+      continue;
+    }
+
+    cur += ch;
+  }
+
+  if (cur.trim().length > 0) records.push(cur);
+  return records;
+}
+
 function isLikertValue(v) {
   return /^[1-5]$/.test(String(v ?? "").trim());
 }
@@ -266,7 +299,7 @@ function classifyTercil(mean, favorableHigh){ if(favorableHigh){ if(mean<=2.33)r
 function calculateRespondent(answerById){ const bySubscale={}; for(const item of QUESTIONNAIRE){ const raw=(answerById[item.id]??"").trim(); if(!/^[1-5]$/.test(raw)) throw new Error(`Valor inválido em ${item.id}: esperado 1..5.`); let score=Number(raw); if(item.reverse) score=6-score; if(!bySubscale[item.subscale]) bySubscale[item.subscale]={scores:[],favorableHigh:item.favorableHigh}; bySubscale[item.subscale].scores.push(score);} const subscales=Object.entries(bySubscale).map(([name,info])=>{ const mean=info.scores.reduce((a,b)=>a+b,0)/info.scores.length; return {name,mean:Number(mean.toFixed(2)),...classifyTercil(mean,info.favorableHigh),favorableHigh:info.favorableHigh};}); return {subscales}; }
 
 function parseCsv(text){
-  const lines=text.split(/\r?\n/).filter((l)=>l.trim().length>0);
+  const lines=splitDelimitedRecords(text);
   if(lines.length<2) throw new Error("CSV sem dados.");
 
   // Detecta linha de cabeçalho mais provável (alguns exports repetem cabeçalho no meio)
