@@ -282,10 +282,10 @@ function buildSequentialPontosIndex(headers) {
   if (seq.length < 76) return null;
 
   const mapping = {};
-  for (let i = 0; i < 76; i += 1) {
+  for (let i = 0; i < Math.min(76, seq.length); i += 1) {
     mapping[`q${i + 1}`] = seq[i];
   }
-  return mapping;
+  return { mapping, sequence: seq };
 }
 
 function buildCanonicalIndex(headers) {
@@ -350,7 +350,22 @@ function parseCsv(text){
   const sequentialPontos = buildSequentialPontosIndex(headers);
   if (sequentialPontos) {
     QUESTIONNAIRE.forEach((q) => {
-      if (canonicalToIndex[q.id] === undefined) canonicalToIndex[q.id] = sequentialPontos[q.id];
+      if (canonicalToIndex[q.id] === undefined && sequentialPontos.mapping[q.id] !== undefined) {
+        canonicalToIndex[q.id] = sequentialPontos.mapping[q.id];
+      }
+    });
+
+    // fallback final: completa lacunas restantes com a próxima coluna "Pontos" ainda não usada
+    const used = new Set(Object.values(canonicalToIndex));
+    let ptr = 0;
+    QUESTIONNAIRE.forEach((q) => {
+      if (canonicalToIndex[q.id] !== undefined) return;
+      while (ptr < sequentialPontos.sequence.length && used.has(sequentialPontos.sequence[ptr])) ptr += 1;
+      if (ptr < sequentialPontos.sequence.length) {
+        canonicalToIndex[q.id] = sequentialPontos.sequence[ptr];
+        used.add(sequentialPontos.sequence[ptr]);
+        ptr += 1;
+      }
     });
   }
 
