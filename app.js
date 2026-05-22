@@ -234,6 +234,21 @@ function buildStrictTripletMappingFromQuestions(headers) {
   return mapping;
 }
 
+function buildQuestionTripletByAnchor(headers) {
+  const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
+  const q1Text = normalizeQuestionText(QUESTIONNAIRE[0].text);
+  const q1Idx = normalizedHeaders.findIndex((h) => h === q1Text);
+  if (q1Idx < 0) return null;
+
+  const mapping = {};
+  for (let i = 0; i < 76; i += 1) {
+    const idx = q1Idx + i * 3;
+    if (idx >= headers.length) return null;
+    mapping[`q${i + 1}`] = idx;
+  }
+  return mapping;
+}
+
 
 
 
@@ -316,13 +331,9 @@ function parseLikertValue(rawValue) {
 }
 
 function getLikertFromRow(cols, preferredIdx) {
-  const picks = [preferredIdx, preferredIdx + 1, preferredIdx - 1, preferredIdx + 2, preferredIdx - 2];
-  for (const idx of picks) {
-    if (idx === undefined || idx === null || idx < 0 || idx >= cols.length) continue;
-    const value = String(cols[idx] ?? "").trim();
-    const parsed = parseLikertValue(value);
-    if (parsed !== null) return String(parsed);
-  }
+  // Regra fixa para evitar "andar colunas":
+  // usa exclusivamente a coluna mapeada para a pergunta qN.
+  if (preferredIdx === undefined || preferredIdx === null || preferredIdx < 0 || preferredIdx >= cols.length) return "";
   return String(cols[preferredIdx] ?? "").trim();
 }
 
@@ -412,8 +423,15 @@ function parseCsv(text){
   let canonicalToIndex=buildCanonicalIndex(headers);
 
   // Regra principal para o formato fixo informado pelo utilizador:
-  // cada pergunta vem em tríade [Pergunta, Pontos - Pergunta, Comentários - Pergunta].
-  // Portanto devemos priorizar SEMPRE a coluna de Pontos para q1..q76.
+  // após q1, as respostas seguem em blocos de 3 colunas por pergunta
+  // [Pergunta, Pontos - Pergunta, Comentários - Pergunta].
+  // Para evitar "andar colunas", ancora em q1 e avança +3 por questão.
+  const anchoredTripletMap = buildQuestionTripletByAnchor(headers);
+  if (anchoredTripletMap) {
+    canonicalToIndex = anchoredTripletMap;
+  }
+
+  // Fallback por nome das perguntas no cabeçalho.
   const strictTripletMap = buildStrictTripletMappingFromQuestions(headers);
   QUESTIONNAIRE.forEach((q) => {
     if (strictTripletMap[q.id] !== undefined) canonicalToIndex[q.id] = strictTripletMap[q.id];
@@ -464,7 +482,7 @@ function parseCsv(text){
     });
 
     // Só inclui linha se tiver ao menos 1 resposta Likert
-    const validCount = required.reduce((acc, q) => acc + (isLikertValue(answers[q]) ? 1 : 0), 0);
+    const validCount = required.reduce((acc, q) => acc + (parseLikertValue(answers[q]) !== null ? 1 : 0), 0);
     if (validCount === 0) continue;
 
     respondents.push(calculateRespondent(answers));
