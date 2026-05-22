@@ -183,7 +183,7 @@ function normalizeHeaderName(value) {
 
 function toCanonicalQuestionKey(value) {
   const v = normalizeHeaderName(value);
-  const m = v.match(/^q(?:uest(?:ao|ão)?|uestion)?(\d{1,3})$/i) || v.match(/^(\d{1,3})$/);
+  const m = v.match(/^q(?:uest(?:ao|ão)?|uestion)?(\d{1,3})$/i);
   if (!m) return null;
   const n = Number(m[1]);
   if (!Number.isInteger(n) || n < 1 || n > 76) return null;
