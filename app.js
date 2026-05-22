@@ -354,7 +354,8 @@ function scoreHeaderCandidate(headers) {
 
 
 function isAdministrativePontosHeader(normalizedHeader) {
-  return normalizedHeader === "cargo" || normalizedHeader === "setorareacurso" || normalizedHeader === "totaldepontos";
+  const compact = String(normalizedHeader || "").replace(/\s+/g, "");
+  return compact === "cargo" || compact === "setorareacurso" || compact === "totaldepontos";
 }
 
 function buildSequentialPontosIndex(headers) {
