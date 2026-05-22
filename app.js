@@ -281,12 +281,39 @@ function isLikertValue(v) {
   return /^[1-5]$/.test(String(v ?? "").trim());
 }
 
+function parseLikertValue(rawValue) {
+  const raw = String(rawValue ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (/^[1-5]$/.test(raw)) return Number(raw);
+
+  const normalized = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (/(nunca|quase nunca)/.test(normalized)) return 1;
+  if (/raramente/.test(normalized)) return 2;
+  if (/(as vezes|às vezes)/.test(normalized)) return 3;
+  if (/frequentemente/.test(normalized)) return 4;
+  if (/sempre/.test(normalized)) return 5;
+
+  if (/(nada|quase nada)/.test(normalized)) return 1;
+  if (/um pouco/.test(normalized)) return 2;
+  if (/moderadamente/.test(normalized)) return 3;
+  if (/muito/.test(normalized)) return 4;
+  if (/extremamente/.test(normalized)) return 5;
+
+  return null;
+}
+
 function getLikertFromRow(cols, preferredIdx) {
   const picks = [preferredIdx, preferredIdx + 1, preferredIdx - 1, preferredIdx + 2, preferredIdx - 2];
   for (const idx of picks) {
     if (idx === undefined || idx === null || idx < 0 || idx >= cols.length) continue;
     const value = String(cols[idx] ?? "").trim();
-    if (isLikertValue(value)) return value;
+    const parsed = parseLikertValue(value);
+    if (parsed !== null) return String(parsed);
   }
   return String(cols[preferredIdx] ?? "").trim();
 }
@@ -363,7 +390,7 @@ function buildCanonicalIndex(headers) {
 
 function classifyTercil(mean, favorableHigh){ if(favorableHigh){ if(mean<=2.33)return{color:"red",label:"Risco para a saúde"}; if(mean<3.66)return{color:"yellow",label:"Intermédio"}; return{color:"green",label:"Situação favorável"}; } if(mean<=2.33)return{color:"green",label:"Situação favorável"}; if(mean<3.66)return{color:"yellow",label:"Intermédio"}; return{color:"red",label:"Risco para a saúde"}; }
 
-function calculateRespondent(answerById){ const bySubscale={}; for(const item of QUESTIONNAIRE){ const raw=(answerById[item.id]??"").trim(); if(!/^[1-5]$/.test(raw)) throw new Error(`Valor inválido em ${item.id}: esperado 1..5.`); let score=Number(raw); if(item.reverse) score=6-score; if(!bySubscale[item.subscale]) bySubscale[item.subscale]={scores:[],favorableHigh:item.favorableHigh}; bySubscale[item.subscale].scores.push(score);} const subscales=Object.entries(bySubscale).map(([name,info])=>{ const mean=info.scores.reduce((a,b)=>a+b,0)/info.scores.length; return {name,mean:Number(mean.toFixed(2)),...classifyTercil(mean,info.favorableHigh),favorableHigh:info.favorableHigh};}); return {subscales}; }
+function calculateRespondent(answerById){ const bySubscale={}; for(const item of QUESTIONNAIRE){ const raw=(answerById[item.id]??"").trim(); const parsed = parseLikertValue(raw); if(parsed === null) throw new Error(`Valor inválido em ${item.id}: esperado 1..5 ou texto correspondente (ex.: Raramente, Sempre).`); let score=Number(parsed); if(item.reverse) score=6-score; if(!bySubscale[item.subscale]) bySubscale[item.subscale]={scores:[],favorableHigh:item.favorableHigh}; bySubscale[item.subscale].scores.push(score);} const subscales=Object.entries(bySubscale).map(([name,info])=>{ const mean=info.scores.reduce((a,b)=>a+b,0)/info.scores.length; return {name,mean:Number(mean.toFixed(2)),...classifyTercil(mean,info.favorableHigh),favorableHigh:info.favorableHigh};}); return {subscales}; }
 
 function parseCsv(text){
   const lines=splitDelimitedRecords(text);
