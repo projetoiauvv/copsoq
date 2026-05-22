@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>COPSOQ II – Versão Média (Análise por planilha)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="container">
+      <h1>COPSOQ II – Versão Média</h1>
+      <p class="subtitle">Análise automática por planilha de todos os colaboradores (76 perguntas)</p>
+    </header>
+
+    <main class="container grid-single">
+      <section class="card">
+        <h2>Importar planilha CSV</h2>
+        <p>
+          Envie a planilha com cabeçalho contendo obrigatoriamente as colunas
+          <code>q1</code> até <code>q76</code>. Cada linha deve representar um colaborador.
+        </p>
+        <input id="csv-input" type="file" accept=".csv" />
+        <div class="actions">
+          <button id="analyze-base-btn" type="button">Analisar planilha completa</button>
+          <button id="download-batch-json-btn" type="button" class="secondary">Exportar resultado JSON</button>
+          <button id="download-batch-pdf-btn" type="button" class="secondary">Baixar relatório PDF</button>
+        </div>
+        <p id="base-summary"></p>
+      </section>
+
+      <section class="card" id="report-card">
+        <h2>Relatório consolidado (toda a base)</h2>
+        <div id="report-empty">Importe a planilha para gerar o relatório consolidado.</div>
+        <div id="report-content" class="hidden">
+          <p><strong>Total de colaboradores analisados:</strong> <span id="total-respondents"></span></p>
+          <p><strong>Índice global médio:</strong> <span id="global-index"></span></p>
+          <div id="dimension-results"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
