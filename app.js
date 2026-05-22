@@ -281,6 +281,16 @@ function isLikertValue(v) {
   return /^[1-5]$/.test(String(v ?? "").trim());
 }
 
+function getLikertFromRow(cols, preferredIdx) {
+  const picks = [preferredIdx, preferredIdx + 1, preferredIdx - 1, preferredIdx + 2, preferredIdx - 2];
+  for (const idx of picks) {
+    if (idx === undefined || idx === null || idx < 0 || idx >= cols.length) continue;
+    const value = String(cols[idx] ?? "").trim();
+    if (isLikertValue(value)) return value;
+  }
+  return String(cols[preferredIdx] ?? "").trim();
+}
+
 function scoreHeaderCandidate(headers) {
   const qMap = buildQuestionTextToKeyMap();
   let count = 0;
@@ -426,7 +436,9 @@ function parseCsv(text){
     if (firstCell === "id" || firstCell === "q1") continue;
 
     const answers={};
-    required.forEach((q)=>{answers[q]=String(cols[canonicalToIndex[q]]??"").trim();});
+    required.forEach((q)=>{
+      answers[q] = getLikertFromRow(cols, canonicalToIndex[q]);
+    });
 
     // Só inclui linha se tiver ao menos 1 resposta Likert
     const validCount = required.reduce((acc, q) => acc + (isLikertValue(answers[q]) ? 1 : 0), 0);
