@@ -237,13 +237,27 @@ function buildStrictTripletMappingFromQuestions(headers) {
 function buildQuestionTripletByAnchor(headers) {
   const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
   const q1Text = normalizeQuestionText(QUESTIONNAIRE[0].text);
-  const q1Idx = normalizedHeaders.findIndex((h) => h === q1Text);
+  let q1Idx = normalizedHeaders.findIndex((h) => h === q1Text);
+
+  // Fallback explícito para o modelo informado:
+  // q1 começa na 15ª coluna da planilha (índice 14, base 0).
+  if (q1Idx < 0 && headers.length >= 15) q1Idx = 14;
   if (q1Idx < 0) return null;
 
   const mapping = {};
   for (let i = 0; i < 76; i += 1) {
     const idx = q1Idx + i * 3;
     if (idx >= headers.length) return null;
+
+    // Sanidade: a coluna âncora do bloco deve parecer a pergunta esperada.
+    // Se não bater, aceita a coluna "Pontos - ..." do mesmo bloco.
+    const expectedText = normalizeQuestionText(QUESTIONNAIRE[i].text);
+    const h0 = normalizeQuestionText(headers[idx]);
+    const h1 = normalizeQuestionText(headers[idx + 1] || "");
+    const h2 = normalizeQuestionText(headers[idx + 2] || "");
+    const hasQuestionInBlock = [h0, h1, h2].some((h) => h.includes(expectedText) || expectedText.includes(h));
+    if (!hasQuestionInBlock) return null;
+
     mapping[`q${i + 1}`] = idx;
   }
   return mapping;
