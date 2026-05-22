@@ -519,7 +519,25 @@ function parseCsv(text){
 function consolidateBatch(respondents){ const bySub={}; respondents.forEach((r)=>{ r.subscales.forEach((s)=>{ if(!bySub[s.name]) bySub[s.name]={means:[],favorableHigh:s.favorableHigh}; bySub[s.name].means.push(s.mean);});}); const subscales=Object.entries(bySub).map(([name,info])=>{ const mean=info.means.reduce((a,b)=>a+b,0)/info.means.length; return {name,mean:Number(mean.toFixed(2)),respondents:info.means.length,...classifyTercil(mean,info.favorableHigh)};}); return {generatedAt:new Date().toISOString(),respondentCount:respondents.length,totalQuestions:76,subscales,questionnaire:QUESTIONNAIRE}; }
 
 function renderConsolidatedReport(report){ document.getElementById("report-empty").classList.add("hidden"); document.getElementById("report-content").classList.remove("hidden"); document.getElementById("total-respondents").textContent=String(report.respondentCount); document.getElementById("global-index").textContent="Interpretação fator a fator (sem escore único)."; const container=document.getElementById("dimension-results"); container.innerHTML=""; report.subscales.forEach((s)=>{ const row=document.createElement("div"); row.className="result-row"; row.innerHTML=`<div><strong>${s.name}</strong></div><div>Média: ${s.mean} (1-5)</div><div>Respondentes: ${s.respondents}</div><div class="badge ${s.color==="green"?"low":s.color==="yellow"?"medium":"high"}">${s.label}</div>`; container.appendChild(row);}); }
+<<<<<<< codex/research-copsoq-ii-methodology-for-form-reporting-3wcmyi
+async function readSpreadsheetAsCsvText(file) {
+  const fileName = String(file?.name || "").toLowerCase();
+  if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+    if (!window.XLSX) throw new Error("Biblioteca XLSX não carregada.");
+    const buf = await file.arrayBuffer();
+    const workbook = window.XLSX.read(buf, { type: "array" });
+    const firstSheetName = workbook.SheetNames?.[0];
+    if (!firstSheetName) throw new Error("Arquivo XLSX sem abas.");
+    const worksheet = workbook.Sheets[firstSheetName];
+    return window.XLSX.utils.sheet_to_csv(worksheet, { FS: ";", RS: "\n" });
+  }
+  return file.text();
+}
+
+function analyzeCsvBase(){ const file=document.getElementById("csv-input").files?.[0]; if(!file) return alert("Selecione a planilha (.csv ou .xlsx)."); readSpreadsheetAsCsvText(file).then((text)=>{ try{ const respondents=parseCsv(text); const report=consolidateBatch(respondents); window.__LAST_BATCH_REPORT__=report; renderConsolidatedReport(report); document.getElementById("base-summary").textContent=`Planilha analisada: ${report.respondentCount} colaboradores, 29 subescalas.`; } catch(e){ alert(e.message);} }).catch((e)=>alert(e.message));}
+=======
 function analyzeCsvBase(){ const file=document.getElementById("csv-input").files?.[0]; if(!file) return alert("Selecione a planilha CSV."); file.text().then((text)=>{ try{ const respondents=parseCsv(text); const report=consolidateBatch(respondents); window.__LAST_BATCH_REPORT__=report; renderConsolidatedReport(report); document.getElementById("base-summary").textContent=`Planilha analisada: ${report.respondentCount} colaboradores, 29 subescalas.`; } catch(e){ alert(e.message);} });}
+>>>>>>> main
 function downloadBatchJson(){ if(!window.__LAST_BATCH_REPORT__) return alert("Analise a planilha antes de exportar."); const blob=new Blob([JSON.stringify(window.__LAST_BATCH_REPORT__,null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="relatorio-copsoq-consolidado.json"; a.click(); }
 function getRiskSummary(subscales) {
   let green = 0;

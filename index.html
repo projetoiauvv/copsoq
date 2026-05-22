@@ -14,12 +14,12 @@
 
     <main class="container grid-single">
       <section class="card">
-        <h2>Importar planilha CSV</h2>
+        <h2>Importar planilha (CSV ou XLSX)</h2>
         <p>
           Envie a planilha com cabeçalho contendo obrigatoriamente as colunas
           <code>q1</code> até <code>q76</code>. Cada linha deve representar um colaborador.
         </p>
-        <input id="csv-input" type="file" accept=".csv" />
+        <input id="csv-input" type="file" accept=".csv,.xlsx,.xls" />
         <div class="actions">
           <button id="analyze-base-btn" type="button">Analisar planilha completa</button>
           <button id="download-batch-json-btn" type="button" class="secondary">Exportar resultado JSON</button>
@@ -40,6 +40,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 # COPSOQ II – Versão Média Portuguesa (76 itens)
 
-Aplicação web para análise automática de planilha CSV (`q1..q76`) com base nas perguntas da versão portuguesa enviadas.
+Aplicação web para análise automática de planilha CSV/XLSX (`q1..q76`) com base nas perguntas da versão portuguesa enviadas.
 
 ## Implementado
 - Perguntas `q1..q76` com textos completos.
@@ -11,6 +11,7 @@ Aplicação web para análise automática de planilha CSV (`q1..q76`) com base n
 - Exportação consolidada em JSON e PDF.
 
 ## Formato da planilha
+- Arquivos aceitos: `.csv`, `.xlsx`, `.xls`
 - Cabeçalho obrigatório com colunas: `q1,q2,...,q76`
 - Cada linha = 1 colaborador
 - Valores permitidos: `1,2,3,4,5`
