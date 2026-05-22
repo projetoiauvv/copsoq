@@ -331,9 +331,18 @@ function parseLikertValue(rawValue) {
 }
 
 function getLikertFromRow(cols, preferredIdx) {
-  // Regra fixa para evitar "andar colunas":
-  // usa exclusivamente a coluna mapeada para a pergunta qN.
+  // Regra para este modelo de planilha:
+  // cada questão ocupa um bloco de 3 colunas e a resposta pode cair em
+  // "Pergunta" ou "Pontos - Pergunta" dependendo da exportação.
+  // Para evitar desvio entre questões, só procura dentro do mesmo bloco.
   if (preferredIdx === undefined || preferredIdx === null || preferredIdx < 0 || preferredIdx >= cols.length) return "";
+  const triplet = [preferredIdx, preferredIdx + 1, preferredIdx + 2];
+  for (const idx of triplet) {
+    if (idx < 0 || idx >= cols.length) continue;
+    const raw = String(cols[idx] ?? "").trim();
+    if (!raw) continue;
+    if (parseLikertValue(raw) !== null) return raw;
+  }
   return String(cols[preferredIdx] ?? "").trim();
 }
 
