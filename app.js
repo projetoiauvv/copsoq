@@ -396,21 +396,9 @@ function parseCsv(text){
   const lines=splitDelimitedRecords(text);
   if(lines.length<2) throw new Error("CSV sem dados.");
 
-  // Detecta linha de cabeçalho mais provável (alguns exports repetem cabeçalho no meio)
-  let bestHeaderIdx = 0;
-  let bestScore = -1;
-  let bestDelimiter = ",";
-  for (let i = 0; i < Math.min(lines.length, 20); i += 1) {
-    const d = detectDelimiter(lines[i]);
-    const h = parseDelimitedLine(lines[i], d);
-    const score = scoreHeaderCandidate(h);
-    if (score > bestScore) {
-      bestScore = score;
-      bestHeaderIdx = i;
-      bestDelimiter = d;
-    }
-  }
-
+  // Regra fixa solicitada: primeira linha é sempre o cabeçalho.
+  const bestHeaderIdx = 0;
+  const bestDelimiter = detectDelimiter(lines[bestHeaderIdx]);
   const headers=parseDelimitedLine(lines[bestHeaderIdx], bestDelimiter);
   const required=QUESTIONNAIRE.map((q)=>q.id);
   let canonicalToIndex=buildCanonicalIndex(headers);
@@ -458,7 +446,7 @@ function parseCsv(text){
   for(let i=bestHeaderIdx+1;i<lines.length;i+=1){
     const cols=parseDelimitedLine(lines[i], bestDelimiter);
 
-    // Ignora repetição de cabeçalho no meio do arquivo
+    // Ignora repetição de cabeçalho no meio do arquivo (se existir)
     const firstCell = String(cols[0] || "").trim().toLowerCase();
     if (firstCell === "id" || firstCell === "q1") continue;
 
