@@ -349,24 +349,14 @@ function parseCsv(text){
   // na ordem do questionário, com colunas administrativas antes (Cargo/Setor).
   const sequentialPontos = buildSequentialPontosIndex(headers);
   if (sequentialPontos) {
-    QUESTIONNAIRE.forEach((q) => {
-      if (canonicalToIndex[q.id] === undefined && sequentialPontos.mapping[q.id] !== undefined) {
-        canonicalToIndex[q.id] = sequentialPontos.mapping[q.id];
-      }
-    });
-
-    // fallback final: completa lacunas restantes com a próxima coluna "Pontos" ainda não usada
-    const used = new Set(Object.values(canonicalToIndex));
-    let ptr = 0;
-    QUESTIONNAIRE.forEach((q) => {
-      if (canonicalToIndex[q.id] !== undefined) return;
-      while (ptr < sequentialPontos.sequence.length && used.has(sequentialPontos.sequence[ptr])) ptr += 1;
-      if (ptr < sequentialPontos.sequence.length) {
-        canonicalToIndex[q.id] = sequentialPontos.sequence[ptr];
-        used.add(sequentialPontos.sequence[ptr]);
-        ptr += 1;
-      }
-    });
+    // Regra mais forte para exports de formulário:
+    // quando houver sequência suficiente de colunas "Pontos – ...",
+    // ela representa a ordem q1..q76 e deve prevalecer.
+    const strictSequentialMap = {};
+    for (let i = 0; i < 76; i += 1) {
+      strictSequentialMap[`q${i + 1}`] = sequentialPontos.sequence[i];
+    }
+    canonicalToIndex = strictSequentialMap;
   }
 
   for(const col of required) {
