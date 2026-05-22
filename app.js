@@ -264,6 +264,30 @@ function scoreHeaderCandidate(headers) {
   return count;
 }
 
+
+function isAdministrativePontosHeader(normalizedHeader) {
+  return normalizedHeader === "cargo" || normalizedHeader === "setorareacurso" || normalizedHeader === "totaldepontos";
+}
+
+function buildSequentialPontosIndex(headers) {
+  const seq = [];
+  headers.forEach((h, idx) => {
+    const raw = String(h || "");
+    if (!/^\s*pontos\s*[–-]/i.test(raw)) return;
+    const normalized = normalizeQuestionText(raw);
+    if (isAdministrativePontosHeader(normalized)) return;
+    seq.push(idx);
+  });
+
+  if (seq.length < 76) return null;
+
+  const mapping = {};
+  for (let i = 0; i < 76; i += 1) {
+    mapping[`q${i + 1}`] = seq[i];
+  }
+  return mapping;
+}
+
 function buildCanonicalIndex(headers) {
   const required=QUESTIONNAIRE.map((q)=>q.id);
   const questionTextMap = buildQuestionTextToKeyMap();
@@ -319,7 +343,16 @@ function parseCsv(text){
 
   const headers=parseDelimitedLine(lines[bestHeaderIdx], bestDelimiter);
   const required=QUESTIONNAIRE.map((q)=>q.id);
-  const canonicalToIndex=buildCanonicalIndex(headers);
+  let canonicalToIndex=buildCanonicalIndex(headers);
+
+  // Fallback: alguns exports trazem TODAS as respostas em colunas "Pontos – ..."
+  // na ordem do questionário, com colunas administrativas antes (Cargo/Setor).
+  const sequentialPontos = buildSequentialPontosIndex(headers);
+  if (sequentialPontos) {
+    QUESTIONNAIRE.forEach((q) => {
+      if (canonicalToIndex[q.id] === undefined) canonicalToIndex[q.id] = sequentialPontos[q.id];
+    });
+  }
 
   for(const col of required) {
     if(canonicalToIndex[col]===undefined) {
