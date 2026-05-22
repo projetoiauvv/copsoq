@@ -210,6 +210,38 @@ function buildQuestionTextToKeyMap() {
   return map;
 }
 
+function buildStrictTripletMappingFromQuestions(headers) {
+  const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
+  const mapping = {};
+
+  QUESTIONNAIRE.forEach((q, idx) => {
+    const key = `q${idx + 1}`;
+    const qText = normalizeQuestionText(q.text);
+    const pontosPrefix = `pontos ${qText}`;
+
+    // 1) melhor caso: coluna "Pontos – <pergunta>"
+    let pontosIdx = normalizedHeaders.findIndex((h) => h === pontosPrefix || h.endsWith(` ${qText}`) && h.startsWith("pontos "));
+    if (pontosIdx >= 0) {
+      mapping[key] = pontosIdx;
+      return;
+    }
+
+    // 2) caso clássico de tríade: [Pergunta, Pontos-Pergunta, Comentários-Pergunta]
+    const qIdx = normalizedHeaders.findIndex((h) => h === qText);
+    if (qIdx >= 0) {
+      const next = normalizedHeaders[qIdx + 1] || "";
+      if (next.startsWith("pontos ")) {
+        mapping[key] = qIdx + 1;
+        return;
+      }
+      // fallback: usa a própria coluna da pergunta se já vier numérica
+      mapping[key] = qIdx;
+    }
+  });
+
+  return mapping;
+}
+
 
 
 
@@ -345,6 +377,14 @@ function parseCsv(text){
   const headers=parseDelimitedLine(lines[bestHeaderIdx], bestDelimiter);
   const required=QUESTIONNAIRE.map((q)=>q.id);
   let canonicalToIndex=buildCanonicalIndex(headers);
+
+  // Regra principal para o formato fixo informado pelo utilizador:
+  // cada pergunta vem em tríade [Pergunta, Pontos - Pergunta, Comentários - Pergunta].
+  // Portanto devemos priorizar SEMPRE a coluna de Pontos para q1..q76.
+  const strictTripletMap = buildStrictTripletMappingFromQuestions(headers);
+  QUESTIONNAIRE.forEach((q) => {
+    if (strictTripletMap[q.id] !== undefined) canonicalToIndex[q.id] = strictTripletMap[q.id];
+  });
 
   // Fallback: alguns exports trazem TODAS as respostas em colunas "Pontos – ..."
   // na ordem do questionário, com colunas administrativas antes (Cargo/Setor).
