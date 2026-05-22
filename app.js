@@ -219,24 +219,16 @@ function buildStrictTripletMappingFromQuestions(headers) {
     const qText = normalizeQuestionText(q.text);
     const pontosPrefix = `pontos ${qText}`;
 
-    // 1) melhor caso: coluna "Pontos – <pergunta>"
-    let pontosIdx = normalizedHeaders.findIndex((h) => h === pontosPrefix || h.endsWith(` ${qText}`) && h.startsWith("pontos "));
-    if (pontosIdx >= 0) {
-      mapping[key] = pontosIdx;
+    // 1) regra solicitada: priorizar a coluna da própria pergunta (ex.: coluna O para q1)
+    const qIdx = normalizedHeaders.findIndex((h) => h === qText);
+    if (qIdx >= 0) {
+      mapping[key] = qIdx;
       return;
     }
 
-    // 2) caso clássico de tríade: [Pergunta, Pontos-Pergunta, Comentários-Pergunta]
-    const qIdx = normalizedHeaders.findIndex((h) => h === qText);
-    if (qIdx >= 0) {
-      const next = normalizedHeaders[qIdx + 1] || "";
-      if (next.startsWith("pontos ")) {
-        mapping[key] = qIdx + 1;
-        return;
-      }
-      // fallback: usa a própria coluna da pergunta se já vier numérica
-      mapping[key] = qIdx;
-    }
+    // 2) fallback: coluna "Pontos – <pergunta>"
+    const pontosIdx = normalizedHeaders.findIndex((h) => h === pontosPrefix || (h.endsWith(` ${qText}`) && h.startsWith("pontos ")));
+    if (pontosIdx >= 0) mapping[key] = pontosIdx;
   });
 
   return mapping;
@@ -285,6 +277,8 @@ function parseLikertValue(rawValue) {
   const raw = String(rawValue ?? "").trim().toLowerCase();
   if (!raw) return null;
   if (/^[1-5]$/.test(raw)) return Number(raw);
+  const numericInText = raw.match(/\b([1-5])\b/);
+  if (numericInText) return Number(numericInText[1]);
 
   const normalized = raw
     .normalize("NFD")
@@ -294,7 +288,7 @@ function parseLikertValue(rawValue) {
 
   if (/(nunca|quase nunca)/.test(normalized)) return 1;
   if (/raramente/.test(normalized)) return 2;
-  if (/(as vezes|às vezes)/.test(normalized)) return 3;
+  if (/as vezes/.test(normalized)) return 3;
   if (/frequentemente/.test(normalized)) return 4;
   if (/sempre/.test(normalized)) return 5;
 
@@ -303,6 +297,20 @@ function parseLikertValue(rawValue) {
   if (/moderadamente/.test(normalized)) return 3;
   if (/muito/.test(normalized)) return 4;
   if (/extremamente/.test(normalized)) return 5;
+
+  // Escala de satisfação/qualidade frequentemente usada em exports
+  if (/muito satisfeito/.test(normalized)) return 5;
+  if (/satisfeito/.test(normalized)) return 4;
+  if (/nem satisfeito nem insatisfeito|neutro/.test(normalized)) return 3;
+  if (/insatisfeito/.test(normalized)) return 2;
+  if (/muito insatisfeito/.test(normalized)) return 1;
+
+  // Escala saúde geral textual (excelente -> deficitária)
+  if (/excelente/.test(normalized)) return 1;
+  if (/muito boa/.test(normalized)) return 2;
+  if (/boa/.test(normalized)) return 3;
+  if (/razoavel/.test(normalized)) return 4;
+  if (/deficitaria/.test(normalized)) return 5;
 
   return null;
 }
