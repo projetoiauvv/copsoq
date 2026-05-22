@@ -211,35 +211,82 @@ function buildQuestionTextToKeyMap() {
 }
 
 
+
+function isLikertValue(v) {
+  return /^[1-5]$/.test(String(v ?? "").trim());
+}
+
+function scoreHeaderCandidate(headers) {
+  const qMap = buildQuestionTextToKeyMap();
+  let count = 0;
+  headers.forEach((h) => {
+    const direct = toCanonicalQuestionKey(h);
+    if (direct) {
+      count += 1;
+      return;
+    }
+    const byText = qMap[normalizeQuestionText(h)];
+    if (byText) count += 1;
+  });
+  return count;
+}
+
+function buildCanonicalIndex(headers) {
+  const required=QUESTIONNAIRE.map((q)=>q.id);
+  const questionTextMap = buildQuestionTextToKeyMap();
+  const candidates = {};
+
+  headers.forEach((h,i)=>{
+    const direct = toCanonicalQuestionKey(h);
+    if (direct) {
+      if (!candidates[direct]) candidates[direct] = [];
+      candidates[direct].push(i);
+      return;
+    }
+    const byText = questionTextMap[normalizeQuestionText(h)];
+    if (byText) {
+      if (!candidates[byText]) candidates[byText] = [];
+      candidates[byText].push(i);
+    }
+  });
+
+  const canonicalToIndex = {};
+  required.forEach((q) => {
+    const idxs = candidates[q] || [];
+    if (!idxs.length) return;
+    // Prefer colunas "Pontos - ..." quando houver duplicidade
+    const pontosIdx = idxs.find((idx) => /^\s*pontos\s*[–-]/i.test(String(headers[idx] || "")));
+    canonicalToIndex[q] = pontosIdx ?? idxs[0];
+  });
+  return canonicalToIndex;
+}
+
 function classifyTercil(mean, favorableHigh){ if(favorableHigh){ if(mean<=2.33)return{color:"red",label:"Risco para a saúde"}; if(mean<3.66)return{color:"yellow",label:"Intermédio"}; return{color:"green",label:"Situação favorável"}; } if(mean<=2.33)return{color:"green",label:"Situação favorável"}; if(mean<3.66)return{color:"yellow",label:"Intermédio"}; return{color:"red",label:"Risco para a saúde"}; }
 
 function calculateRespondent(answerById){ const bySubscale={}; for(const item of QUESTIONNAIRE){ const raw=(answerById[item.id]??"").trim(); if(!/^[1-5]$/.test(raw)) throw new Error(`Valor inválido em ${item.id}: esperado 1..5.`); let score=Number(raw); if(item.reverse) score=6-score; if(!bySubscale[item.subscale]) bySubscale[item.subscale]={scores:[],favorableHigh:item.favorableHigh}; bySubscale[item.subscale].scores.push(score);} const subscales=Object.entries(bySubscale).map(([name,info])=>{ const mean=info.scores.reduce((a,b)=>a+b,0)/info.scores.length; return {name,mean:Number(mean.toFixed(2)),...classifyTercil(mean,info.favorableHigh),favorableHigh:info.favorableHigh};}); return {subscales}; }
 
 function parseCsv(text){
-  const lines=text.trim().split(/\r?\n/).filter(Boolean);
+  const lines=text.split(/\r?\n/).filter((l)=>l.trim().length>0);
   if(lines.length<2) throw new Error("CSV sem dados.");
 
-  const delimiter=detectDelimiter(lines[0]);
-  const headers=parseDelimitedLine(lines[0], delimiter);
+  // Detecta linha de cabeçalho mais provável (alguns exports repetem cabeçalho no meio)
+  let bestHeaderIdx = 0;
+  let bestScore = -1;
+  let bestDelimiter = ",";
+  for (let i = 0; i < Math.min(lines.length, 20); i += 1) {
+    const d = detectDelimiter(lines[i]);
+    const h = parseDelimitedLine(lines[i], d);
+    const score = scoreHeaderCandidate(h);
+    if (score > bestScore) {
+      bestScore = score;
+      bestHeaderIdx = i;
+      bestDelimiter = d;
+    }
+  }
+
+  const headers=parseDelimitedLine(lines[bestHeaderIdx], bestDelimiter);
   const required=QUESTIONNAIRE.map((q)=>q.id);
-  const canonicalToIndex={};
-  const questionTextMap = buildQuestionTextToKeyMap();
-
-  headers.forEach((h,i)=>{
-    // 1) tentativa direta por q1..q76 e variações
-    const direct = toCanonicalQuestionKey(h);
-    if (direct && canonicalToIndex[direct]===undefined) {
-      canonicalToIndex[direct]=i;
-      return;
-    }
-
-    // 2) tentativa por texto da pergunta / Pontos – <pergunta>
-    const normalizedText = normalizeQuestionText(h);
-    const byText = questionTextMap[normalizedText];
-    if (byText && canonicalToIndex[byText]===undefined) {
-      canonicalToIndex[byText]=i;
-    }
-  });
+  const canonicalToIndex=buildCanonicalIndex(headers);
 
   for(const col of required) {
     if(canonicalToIndex[col]===undefined) {
@@ -248,12 +295,24 @@ function parseCsv(text){
   }
 
   const respondents=[];
-  for(let i=1;i<lines.length;i+=1){
-    const cols=parseDelimitedLine(lines[i], delimiter);
+  for(let i=bestHeaderIdx+1;i<lines.length;i+=1){
+    const cols=parseDelimitedLine(lines[i], bestDelimiter);
+
+    // Ignora repetição de cabeçalho no meio do arquivo
+    const firstCell = String(cols[0] || "").trim().toLowerCase();
+    if (firstCell === "id" || firstCell === "q1") continue;
+
     const answers={};
-    required.forEach((q)=>{answers[q]=cols[canonicalToIndex[q]]??"";});
+    required.forEach((q)=>{answers[q]=String(cols[canonicalToIndex[q]]??"").trim();});
+
+    // Só inclui linha se tiver ao menos 1 resposta Likert
+    const validCount = required.reduce((acc, q) => acc + (isLikertValue(answers[q]) ? 1 : 0), 0);
+    if (validCount === 0) continue;
+
     respondents.push(calculateRespondent(answers));
   }
+
+  if (!respondents.length) throw new Error("Nenhuma linha de resposta válida encontrada após o cabeçalho.");
   return respondents;
 }
 
