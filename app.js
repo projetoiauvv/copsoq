@@ -88,7 +88,7 @@ const QUESTION_TEXTS = [
   "As sugestões dos funcionários são tratadas de forma séria pela gerência?",
   "O trabalho é igualmente distribuído pelos funcionários?",
   "Sou sempre capaz de resolver problemas, se tentar o suficiente.",
-  "É-me fácil seguir os meus planos e atingir os meus objectivos.",
+  "Tenho facilidade em seguir os meus planos e atingir os meus objetivos.",
   "O seu trabalho tem algum significado para si?",
   "Sente que o seu trabalho é importante?",
   "Sente-se motivado e envolvido com o seu trabalho?",
