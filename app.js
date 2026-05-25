@@ -271,6 +271,29 @@ function buildQuestionOnlyColumnMap(headers) {
   return mapping;
 }
 
+
+function buildPontosOnlyQuestionMap(headers) {
+  const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
+  const mapping = {};
+
+  QUESTIONNAIRE.forEach((q, idx) => {
+    const key = `q${idx + 1}`;
+    const qText = normalizeQuestionText(q.text);
+    const expected = `pontos ${qText}`;
+
+    const exactIdx = normalizedHeaders.findIndex((h) => h === expected);
+    if (exactIdx >= 0) {
+      mapping[key] = { idx: exactIdx, kind: "pontos" };
+      return;
+    }
+
+    const fuzzyIdx = normalizedHeaders.findIndex((h) => h.startsWith("pontos ") && (h.includes(qText) || qText.includes(h.replace(/^pontos\s+/, ""))));
+    if (fuzzyIdx >= 0) mapping[key] = { idx: fuzzyIdx, kind: "pontos" };
+  });
+
+  return mapping;
+}
+
 function buildQuestionTripletByAnchor(headers) {
   const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
   const q1Text = normalizeQuestionText(QUESTIONNAIRE[0].text);
@@ -502,6 +525,8 @@ function parseCsv(text){
   const headers=parseDelimitedLine(lines[bestHeaderIdx], bestDelimiter);
   const required=QUESTIONNAIRE.map((q)=>q.id);
   let canonicalToIndex=buildCanonicalIndex(headers);
+  const pontosOnlyMap = buildPontosOnlyQuestionMap(headers);
+  const hasFullPontosMap = QUESTIONNAIRE.every((_, i) => pontosOnlyMap[`q${i + 1}`]);
   const questionOnlyMap = buildQuestionOnlyColumnMap(headers);
   const hasFullQuestionMap = QUESTIONNAIRE.every((_, i) => questionOnlyMap[`q${i + 1}`]);
 
@@ -510,7 +535,7 @@ function parseCsv(text){
   // [Pergunta, Pontos - Pergunta, Comentários - Pergunta].
   // Para evitar "andar colunas", ancora em q1 e avança +3 por questão.
   const anchoredTripletMap = buildQuestionTripletByAnchor(headers);
-  if (anchoredTripletMap && !hasFullQuestionMap) canonicalToIndex = anchoredTripletMap;
+  if (!hasFullPontosMap && anchoredTripletMap && !hasFullQuestionMap) canonicalToIndex = anchoredTripletMap;
 
   // Fallback por nome das perguntas no cabeçalho.
   const strictTripletMap = buildStrictTripletMappingFromQuestions(headers);
@@ -522,7 +547,7 @@ function parseCsv(text){
   // na ordem do questionário, com colunas administrativas antes (Cargo/Setor).
   const sequentialPontos = buildSequentialPontosIndex(headers);
   const hasQ1FromQuestionColumn = Boolean(questionOnlyMap.q1 && questionOnlyMap.q1.kind === "question");
-  if (sequentialPontos && !hasFullQuestionMap && !hasQ1FromQuestionColumn) {
+  if (!hasFullPontosMap && sequentialPontos && !hasFullQuestionMap && !hasQ1FromQuestionColumn) {
     // Regra mais forte para exports de formulário:
     // quando houver sequência suficiente de colunas "Pontos – ...",
     // ela representa a ordem q1..q76 e deve prevalecer.
@@ -566,9 +591,11 @@ function parseCsv(text){
 
     const answers={};
     required.forEach((q)=>{
-      answers[q] = hasFullQuestionMap
-        ? getLikertFromMappedColumn(cols, questionOnlyMap[q])
-        : getLikertFromRow(cols, canonicalToIndex[q]);
+      answers[q] = hasFullPontosMap
+        ? getLikertFromMappedColumn(cols, pontosOnlyMap[q])
+        : hasFullQuestionMap
+          ? getLikertFromMappedColumn(cols, questionOnlyMap[q])
+          : getLikertFromRow(cols, canonicalToIndex[q]);
     });
 
     // Só inclui linha se tiver ao menos 1 resposta Likert
