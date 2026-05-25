@@ -234,6 +234,29 @@ function buildStrictTripletMappingFromQuestions(headers) {
   return mapping;
 }
 
+function buildQuestionOnlyColumnMap(headers) {
+  const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
+  const mapping = {};
+
+  QUESTIONNAIRE.forEach((q, idx) => {
+    const key = `q${idx + 1}`;
+    const qText = normalizeQuestionText(q.text);
+
+    // Regra principal do projeto: priorizar coluna da PERGUNTA.
+    const questionIdx = normalizedHeaders.findIndex((h) => h === qText);
+    if (questionIdx >= 0) {
+      mapping[key] = { idx: questionIdx, kind: "question" };
+      return;
+    }
+
+    // Fallback: coluna "Pontos - <pergunta>" quando a coluna da pergunta não existir.
+    const pontosIdx = normalizedHeaders.findIndex((h) => h.startsWith("pontos ") && (h === `pontos ${qText}` || h.endsWith(` ${qText}`)));
+    if (pontosIdx >= 0) mapping[key] = { idx: pontosIdx, kind: "pontos" };
+  });
+
+  return mapping;
+}
+
 function buildQuestionTripletByAnchor(headers) {
   const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
   const q1Text = normalizeQuestionText(QUESTIONNAIRE[0].text);
@@ -360,6 +383,22 @@ function getLikertFromRow(cols, preferredIdx) {
   return String(cols[preferredIdx] ?? "").trim();
 }
 
+function getLikertFromMappedColumn(cols, mapped) {
+  if (!mapped || mapped.idx === undefined) return "";
+  const idx = mapped.idx;
+  const candidates = mapped.kind === "question"
+    ? [idx, idx + 1, idx + 2] // bloco da própria pergunta
+    : [idx, idx - 1, idx + 1]; // se veio de "Pontos -", tenta pergunta vizinha também
+
+  for (const cIdx of candidates) {
+    if (cIdx < 0 || cIdx >= cols.length) continue;
+    const raw = String(cols[cIdx] ?? "").trim();
+    if (!raw) continue;
+    if (parseLikertValue(raw) !== null) return raw;
+  }
+  return "";
+}
+
 function scoreHeaderCandidate(headers) {
   const qMap = buildQuestionTextToKeyMap();
   let count = 0;
@@ -378,7 +417,11 @@ function scoreHeaderCandidate(headers) {
 
 function isAdministrativePontosHeader(normalizedHeader) {
   const compact = String(normalizedHeader || "").replace(/\s+/g, "");
-  return compact === "cargo" || compact === "setorareacurso" || compact === "totaldepontos";
+  return compact === "cargo"
+    || compact === "setorareacurso"
+    || compact === "totaldepontos"
+    || compact === "pontoscargo"
+    || compact === "pontossetorareacurso";
 }
 
 function buildSequentialPontosIndex(headers) {
@@ -445,26 +488,27 @@ function parseCsv(text){
   const headers=parseDelimitedLine(lines[bestHeaderIdx], bestDelimiter);
   const required=QUESTIONNAIRE.map((q)=>q.id);
   let canonicalToIndex=buildCanonicalIndex(headers);
+  const questionOnlyMap = buildQuestionOnlyColumnMap(headers);
+  const hasFullQuestionMap = QUESTIONNAIRE.every((_, i) => questionOnlyMap[`q${i + 1}`]);
 
   // Regra principal para o formato fixo informado pelo utilizador:
   // após q1, as respostas seguem em blocos de 3 colunas por pergunta
   // [Pergunta, Pontos - Pergunta, Comentários - Pergunta].
   // Para evitar "andar colunas", ancora em q1 e avança +3 por questão.
   const anchoredTripletMap = buildQuestionTripletByAnchor(headers);
-  if (anchoredTripletMap) {
-    canonicalToIndex = anchoredTripletMap;
-  }
+  if (anchoredTripletMap && !hasFullQuestionMap) canonicalToIndex = anchoredTripletMap;
 
   // Fallback por nome das perguntas no cabeçalho.
   const strictTripletMap = buildStrictTripletMappingFromQuestions(headers);
   QUESTIONNAIRE.forEach((q) => {
-    if (strictTripletMap[q.id] !== undefined) canonicalToIndex[q.id] = strictTripletMap[q.id];
+    if (!hasFullQuestionMap && strictTripletMap[q.id] !== undefined) canonicalToIndex[q.id] = strictTripletMap[q.id];
   });
 
   // Fallback: alguns exports trazem TODAS as respostas em colunas "Pontos – ..."
   // na ordem do questionário, com colunas administrativas antes (Cargo/Setor).
   const sequentialPontos = buildSequentialPontosIndex(headers);
-  if (sequentialPontos) {
+  const hasQ1FromQuestionColumn = Boolean(questionOnlyMap.q1 && questionOnlyMap.q1.kind === "question");
+  if (sequentialPontos && !hasFullQuestionMap && !hasQ1FromQuestionColumn) {
     // Regra mais forte para exports de formulário:
     // quando houver sequência suficiente de colunas "Pontos – ...",
     // ela representa a ordem q1..q76 e deve prevalecer.
@@ -480,6 +524,7 @@ function parseCsv(text){
   const normalizedHeaders = headers.map((h) => normalizeQuestionText(h));
   QUESTIONNAIRE.forEach((q, idx) => {
     const key = `q${idx + 1}`;
+    if (hasFullQuestionMap) return;
     if (canonicalToIndex[key] !== undefined) return;
     const qText = normalizeQuestionText(q.text);
     const byContains = normalizedHeaders.findIndex((h) => h.includes(qText) || qText.includes(h));
@@ -502,7 +547,9 @@ function parseCsv(text){
 
     const answers={};
     required.forEach((q)=>{
-      answers[q] = getLikertFromRow(cols, canonicalToIndex[q]);
+      answers[q] = hasFullQuestionMap
+        ? getLikertFromMappedColumn(cols, questionOnlyMap[q])
+        : getLikertFromRow(cols, canonicalToIndex[q]);
     });
 
     // Só inclui linha se tiver ao menos 1 resposta Likert
@@ -519,7 +566,6 @@ function parseCsv(text){
 function consolidateBatch(respondents){ const bySub={}; respondents.forEach((r)=>{ r.subscales.forEach((s)=>{ if(!bySub[s.name]) bySub[s.name]={means:[],favorableHigh:s.favorableHigh}; bySub[s.name].means.push(s.mean);});}); const subscales=Object.entries(bySub).map(([name,info])=>{ const mean=info.means.reduce((a,b)=>a+b,0)/info.means.length; return {name,mean:Number(mean.toFixed(2)),respondents:info.means.length,...classifyTercil(mean,info.favorableHigh)};}); return {generatedAt:new Date().toISOString(),respondentCount:respondents.length,totalQuestions:76,subscales,questionnaire:QUESTIONNAIRE}; }
 
 function renderConsolidatedReport(report){ document.getElementById("report-empty").classList.add("hidden"); document.getElementById("report-content").classList.remove("hidden"); document.getElementById("total-respondents").textContent=String(report.respondentCount); document.getElementById("global-index").textContent="Interpretação fator a fator (sem escore único)."; const container=document.getElementById("dimension-results"); container.innerHTML=""; report.subscales.forEach((s)=>{ const row=document.createElement("div"); row.className="result-row"; row.innerHTML=`<div><strong>${s.name}</strong></div><div>Média: ${s.mean} (1-5)</div><div>Respondentes: ${s.respondents}</div><div class="badge ${s.color==="green"?"low":s.color==="yellow"?"medium":"high"}">${s.label}</div>`; container.appendChild(row);}); }
-<<<<<<< codex/research-copsoq-ii-methodology-for-form-reporting-3wcmyi
 async function readSpreadsheetAsCsvText(file) {
   const fileName = String(file?.name || "").toLowerCase();
   if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
@@ -535,9 +581,7 @@ async function readSpreadsheetAsCsvText(file) {
 }
 
 function analyzeCsvBase(){ const file=document.getElementById("csv-input").files?.[0]; if(!file) return alert("Selecione a planilha (.csv ou .xlsx)."); readSpreadsheetAsCsvText(file).then((text)=>{ try{ const respondents=parseCsv(text); const report=consolidateBatch(respondents); window.__LAST_BATCH_REPORT__=report; renderConsolidatedReport(report); document.getElementById("base-summary").textContent=`Planilha analisada: ${report.respondentCount} colaboradores, 29 subescalas.`; } catch(e){ alert(e.message);} }).catch((e)=>alert(e.message));}
-=======
-function analyzeCsvBase(){ const file=document.getElementById("csv-input").files?.[0]; if(!file) return alert("Selecione a planilha CSV."); file.text().then((text)=>{ try{ const respondents=parseCsv(text); const report=consolidateBatch(respondents); window.__LAST_BATCH_REPORT__=report; renderConsolidatedReport(report); document.getElementById("base-summary").textContent=`Planilha analisada: ${report.respondentCount} colaboradores, 29 subescalas.`; } catch(e){ alert(e.message);} });}
->>>>>>> main
+main
 function downloadBatchJson(){ if(!window.__LAST_BATCH_REPORT__) return alert("Analise a planilha antes de exportar."); const blob=new Blob([JSON.stringify(window.__LAST_BATCH_REPORT__,null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="relatorio-copsoq-consolidado.json"; a.click(); }
 function getRiskSummary(subscales) {
   let green = 0;
