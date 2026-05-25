@@ -141,12 +141,17 @@ function validateQuestionnaireConfig() {
 }
 
 function detectDelimiter(line) {
-  const comma = (line.match(/,/g) || []).length;
-  const semicolon = (line.match(/;/g) || []).length;
-  const tab = (line.match(/	/g) || []).length;
-  if (tab >= comma && tab >= semicolon && tab > 0) return "	";
-  if (semicolon > comma && semicolon > 0) return ";";
-  return ",";
+  const candidates = [",", ";", "	"];
+  let best = ",";
+  let bestFields = 1;
+  for (const d of candidates) {
+    const fields = parseDelimitedLine(line, d).length;
+    if (fields > bestFields) {
+      best = d;
+      bestFields = fields;
+    }
+  }
+  return best;
 }
 
 function parseDelimitedLine(line, delimiter) {
