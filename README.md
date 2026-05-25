@@ -11,7 +11,9 @@ Aplicação web para análise automática de planilha CSV/XLSX (`q1..q76`) com b
 - Exportação consolidada em JSON e PDF.
 
 ## Formato da planilha
-- Arquivos aceitos: `.csv`, `.xlsx`, `.xls`
+- Arquivos aceitos: `.csv`, `.cvs`, `.xlsx`, `.xls`
 - Cabeçalho obrigatório com colunas: `q1,q2,...,q76`
 - Cada linha = 1 colaborador
 - Valores permitidos: `1,2,3,4,5`
+
+> Observação: alguns exportadores geram a extensão `.cvs` por engano; esta aplicação também aceita esse formato.
