@@ -17,3 +17,9 @@ Aplicação web para análise automática de planilha CSV/XLSX (`q1..q76`) com b
 - Valores permitidos: `1,2,3,4,5`
 
 > Observação: alguns exportadores geram a extensão `.cvs` por engano; esta aplicação também aceita esse formato.
+
+## Troubleshooting de conflitos no GitHub
+- Se o botão **Mark as resolved** estiver desabilitado mesmo com `0 conflicts`, rode:
+  - `./scripts/check-conflicts.sh`
+- Se o script acusar marcadores, remova `<<<<<<<`, `=======`, `>>>>>>>` e faça novo commit.
+- Se não houver marcadores, faça um novo commit (mesmo pequeno) e atualize a PR: o GitHub às vezes mantém estado antigo no editor de conflitos.
