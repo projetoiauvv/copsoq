@@ -581,6 +581,7 @@ async function readSpreadsheetAsCsvText(file) {
 }
 
 function analyzeCsvBase(){ const file=document.getElementById("csv-input").files?.[0]; if(!file) return alert("Selecione a planilha (.csv ou .xlsx)."); readSpreadsheetAsCsvText(file).then((text)=>{ try{ const respondents=parseCsv(text); const report=consolidateBatch(respondents); window.__LAST_BATCH_REPORT__=report; renderConsolidatedReport(report); document.getElementById("base-summary").textContent=`Planilha analisada: ${report.respondentCount} colaboradores, 29 subescalas.`; } catch(e){ alert(e.message);} }).catch((e)=>alert(e.message));}
+main
 function downloadBatchJson(){ if(!window.__LAST_BATCH_REPORT__) return alert("Analise a planilha antes de exportar."); const blob=new Blob([JSON.stringify(window.__LAST_BATCH_REPORT__,null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="relatorio-copsoq-consolidado.json"; a.click(); }
 function getRiskSummary(subscales) {
   let green = 0;
